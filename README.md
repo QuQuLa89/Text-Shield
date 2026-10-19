@@ -45,12 +45,20 @@ Report the skill location, CLI executable path, and validation results. If the s
 
 ## Agent Skillとしての使用例
 
-導入後は、対象のファイルを添えて次のように依頼できます。
+導入後は対象のファイル、URL、または本文を添えて次のように依頼できます。
 
 - 「このMarkdownをプロテクトしてください。元原稿は残してください。」
 - 「article.mdに透かしを入れて、article.protected.mdへ保存してください。」
 - 「article.protected.mdの署名を検証してください。元原稿はarticle.mdです。」
 - 「このテキストの不可視文字を調べてください。」
+- 「このURLの記事に私の透かしが入っていないかチェックしてください: `https://example.com/article`」
+- 「この文章に誰の透かしが入っているか調べてください。本文は以下のとおりです: [本文]」
+- 「このリポジトリのMarkdownに透かしの署名がないか検証してください: `https://github.com/[所有者]/[リポジトリ]`。対象はREADME.mdです。」
+- 「このローカルファイルに盗作・転載の形跡がないか検証してください。元原稿はarticle.mdです: suspect.md」
+
+盗作・転載疑惑の検証では、エージェントがWeb取得ツールなどで記事のHTMLやGitHubのRAWテキストを取得し、貼り付け本文と同様にUTF-8の一時ファイルへ保存します。ローカルファイルはそのまま使い、`verify` と必要に応じて `inspect` を実行します。CLI自体にURL取得機能はありません。リポジトリ全体のURLの場合は、確認するファイルや範囲を特定します。検証用の一時ファイルは処理後に削除し、元原稿は残します。
+
+結果は透かしに記載された著作者名・UTC時刻・元原稿ハッシュと、本文の照合結果を分けて報告します。元原稿があれば `--original` で照合できます。透かしは電子署名ではなく、検出だけで盗作や著作者の真正性を断定できません。HTML化やコピーで本文や不可視文字が変わる場合があるため、不一致や透かしの未検出だけで改変の有無や転載の有無も断定できません。詳しい取得・判定手順は [スキル定義](skills/text-shield/SKILL.md#盗作転載疑惑の検証) を参照してください。
 
 スキルは置換を指定しない依頼では `--poison-level off` を使い、処理後に元原稿との照合を実行します。CLIを直接呼ぶ場合の既定値は `medium` です。スキルを配置しても一覧に出ない場合は、新しいエージェントセッションで確認してください。
 
@@ -70,7 +78,7 @@ python -m venv .venv
 ## 原稿の処理
 
 ```powershell
-.\.venv\Scripts\text-shield protect article.md -o article.protected.md --author QuQuLa89 --poison-level off
+.\.venv\Scripts\text-shield protect article.md -o article.protected.md --author "[著作者名]" --poison-level off
 .\.venv\Scripts\text-shield verify article.protected.md --original article.md
 .\.venv\Scripts\text-shield inspect article.protected.md --limit 20
 ```
