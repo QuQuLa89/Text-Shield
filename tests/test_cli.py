@@ -7,14 +7,20 @@ from pathlib import Path
 import pytest
 from markdown_it import MarkdownIt
 
-from text_shield.cli import PAYLOAD_PREFIX
+from text_shield.cli import PAYLOAD_PREFIX, resolve_author
 from text_shield.utils import sha256_text
 from text_shield.watermark import embed_watermark, extract_watermark, strip_watermarks
 
 
-def run_cli(*args, cwd=None):
+def run_cli(*args, cwd=None, env_overrides=None):
     env = os.environ.copy()
     env["PYTHONIOENCODING"] = "utf-8"
+    env["TEXT_SHIELD_AUTHOR"] = "QuQuLa89"
+    for key, value in (env_overrides or {}).items():
+        if value is None:
+            env.pop(key, None)
+        else:
+            env[key] = value
     return subprocess.run(
         [sys.executable, "-m", "text_shield", *map(str, args)],
         cwd=cwd,
@@ -37,7 +43,15 @@ def test_end_to_end(files, tmp_path):
     source, output = files
     original = source.read_bytes()
     result = run_cli(
-        "protect", source, "-o", output, "--poison-level", "off", cwd=tmp_path
+        "protect",
+        source,
+        "-o",
+        output,
+        "--author",
+        "QuQuLa89",
+        "--poison-level",
+        "off",
+        cwd=tmp_path,
     )
     assert result.returncode == 0, result.stderr
     assert not result.stdout
@@ -187,3 +201,117 @@ def test_installed_entrypoint(tmp_path):
     )
     assert result.returncode == 0
     assert result.stdout.strip() == b"0.1.0"
+
+
+@pytest.mark.parametrize(
+    "explicit,environment,git_name,expected",
+    [
+        ("QuQuLa89", "環境変数の名前", "Gitの名前", "QuQuLa89"),
+        (None, " QuQuLa89 🌟 ", "Gitの名前", "QuQuLa89 🌟"),
+        (None, None, " QuQuLa89 日本語 ", "QuQuLa89 日本語"),
+        (None, "  ", "QuQuLa89", "QuQuLa89"),
+    ],
+)
+def test_author_priority_and_payload(
+    files, tmp_path, explicit, environment, git_name, expected
+):
+    source, output = files
+    # Git設定をプロセス内で指定し、実際のローカル・グローバル設定を変更しません。
+    env = {
+        "TEXT_SHIELD_AUTHOR": environment,
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_CONFIG_GLOBAL": os.devnull,
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "user.name",
+        "GIT_CONFIG_VALUE_0": git_name,
+    }
+    options = [] if explicit is None else ["--author", explicit]
+    result = run_cli(
+        "protect",
+        source,
+        "-o",
+        output,
+        "--poison-level",
+        "off",
+        *options,
+        cwd=tmp_path,
+        env_overrides=env,
+    )
+    assert result.returncode == 0, result.stderr
+    signature = extract_watermark(output.read_text(encoding="utf-8"))[0]
+    assert json.loads(signature[len(PAYLOAD_PREFIX) :])["author"] == expected
+    verified = run_cli("verify", output, "--original", source)
+    assert verified.returncode == 0, verified.stdout + verified.stderr
+    assert f"著作者: {json.dumps(expected, ensure_ascii=False)}" in verified.stdout
+
+
+@pytest.mark.parametrize("environment,git_name", [(None, ""), ("  ", " \t ")])
+def test_missing_author_does_not_write(files, tmp_path, environment, git_name):
+    source, output = files
+    original = source.read_bytes()
+    result = run_cli(
+        "protect",
+        source,
+        "-o",
+        output,
+        cwd=tmp_path,
+        env_overrides={
+            "TEXT_SHIELD_AUTHOR": environment,
+            "GIT_CONFIG_NOSYSTEM": "1",
+            "GIT_CONFIG_GLOBAL": os.devnull,
+            "GIT_CONFIG_COUNT": "1",
+            "GIT_CONFIG_KEY_0": "user.name",
+            "GIT_CONFIG_VALUE_0": git_name,
+        },
+    )
+    assert result.returncode == 2
+    assert "著作者名が指定されていません" in result.stderr
+    assert "--author" in result.stderr
+    assert "TEXT_SHIELD_AUTHOR" in result.stderr
+    assert "git config user.name" in result.stderr
+    assert "Traceback" not in result.stderr
+    assert not result.stdout
+    assert not output.exists()
+    assert source.read_bytes() == original
+
+
+@pytest.mark.parametrize("author", ["", " \t "])
+def test_empty_explicit_author_is_rejected(files, author):
+    source, output = files
+    result = run_cli("protect", source, "-o", output, "--author", author)
+    assert result.returncode == 2
+    assert "著作者名が指定されていません" in result.stderr
+    assert not output.exists()
+
+
+@pytest.mark.parametrize("author", [" QuQuLa89 ", None])
+def test_explicit_or_environment_author_does_not_invoke_git(monkeypatch, author):
+    monkeypatch.setenv("TEXT_SHIELD_AUTHOR", "QuQuLa89")
+
+    def unexpected_git(*args, **kwargs):
+        pytest.fail("著作者名が解決済みの場合はGitを呼び出しません。")
+
+    monkeypatch.setattr("text_shield.cli.subprocess.run", unexpected_git)
+    assert resolve_author(author) == "QuQuLa89"
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        FileNotFoundError("git"),
+        subprocess.TimeoutExpired(["git", "config", "user.name"], 5),
+        UnicodeError("invalid UTF-8"),
+        subprocess.CompletedProcess([], 1, stdout="", stderr="not configured"),
+    ],
+)
+def test_unavailable_git_produces_missing_author_error(monkeypatch, failure):
+    monkeypatch.delenv("TEXT_SHIELD_AUTHOR", raising=False)
+
+    def git_config(*args, **kwargs):
+        if isinstance(failure, Exception):
+            raise failure
+        return failure
+
+    monkeypatch.setattr("text_shield.cli.subprocess.run", git_config)
+    with pytest.raises(ValueError, match="著作者名が指定されていません"):
+        resolve_author(None)

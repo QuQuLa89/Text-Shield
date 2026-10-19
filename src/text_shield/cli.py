@@ -3,7 +3,9 @@
 import argparse
 import bisect
 import json
+import os
 import re
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -29,13 +31,39 @@ def read_text(path: Path) -> str:
         return stream.read()
 
 
+def resolve_author(author: str | None) -> str:
+    if author is None:
+        author = os.environ.get("TEXT_SHIELD_AUTHOR", "").strip()
+        if not author:
+            try:
+                result = subprocess.run(
+                    ["git", "config", "user.name"],
+                    capture_output=True,
+                    encoding="utf-8",
+                    check=False,
+                    timeout=5,
+                )
+                if result.returncode == 0:
+                    author = result.stdout.strip()
+            except (OSError, UnicodeError, subprocess.TimeoutExpired):
+                pass
+    if not author or not author.strip():
+        raise ValueError(
+            "著作者名が指定されていません。--author オプションを指定するか、"
+            "環境変数 TEXT_SHIELD_AUTHOR または git config user.name を"
+            "設定してください。"
+        )
+    return author.strip()
+
+
 def protect(args: argparse.Namespace) -> int:
+    author = resolve_author(args.author)
     source = read_text(args.input_file)
     if extract_watermark(source):
         raise ValueError("既存の透かしがあります。元原稿から処理してください。")
-    body = disturb_tokens(inject_opt_out(source, args.author), args.poison_level)
+    body = disturb_tokens(inject_opt_out(source, author), args.poison_level)
     payload = {
-        "author": args.author,
+        "author": author,
         "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "source_sha256": sha256_text(source),
         "content_sha256": sha256_text(body),
@@ -145,7 +173,14 @@ def main(argv: list[str] | None = None) -> int:
     protect_parser = commands.add_parser("protect", help="原稿を処理します。")
     protect_parser.add_argument("input_file", type=Path)
     protect_parser.add_argument("-o", "--output", type=Path)
-    protect_parser.add_argument("--author", default="QuQuLa89")
+    protect_parser.add_argument(
+        "--author",
+        default=None,
+        help=(
+            "著作者名。省略時はTEXT_SHIELD_AUTHOR、"
+            "git config user.nameの順に取得します。"
+        ),
+    )
     protect_parser.add_argument(
         "--poison-level", choices=PROBABILITIES, default="medium"
     )

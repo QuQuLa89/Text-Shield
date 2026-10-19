@@ -4,6 +4,56 @@ Markdownやテキストに、学習利用のオプトアウト宣言、ゼロ幅
 
 作成者はQuQuLa89、バージョンは0.1.0です。Python 3.10以上、4.0未満で動作し、実行時の外部依存はありません。
 
+## CLIとAgent Skillのハイブリッド配布
+
+同じリポジトリにPython CLIと [Agent Skillの定義](skills/text-shield/SKILL.md) を同梱しています。ターミナルから直接使う場合はCLIを、自然言語で処理を依頼する場合はAgent Skillを導入してください。Agent Skillも実際の処理にはCLIを使うため、Python環境とCLIのインストールが必要です。
+
+スキルはリポジトリ内の `skills/text-shield/` フォルダを各エージェントのスキル領域へ配置して導入します。`pip install .` だけでは、エージェントへのスキル登録は行われません。
+
+## 🤖 AIエージェント向け一発インストールプロンプト
+
+このリポジトリをcloneまたはZIPから展開してから、次の手順で `text-shield` フォルダのパスをコピーしてください。パスは、フォルダがどこにあるかを表す文字列です。
+
+- **Windows**: 展開した `text-shield` フォルダを、Shiftキーを押しながら右クリックし、「パスのコピー」を選びます。Windows 11では、右クリックメニューの「パスのコピー」からもコピーできます。
+- **macOS**: `text-shield` フォルダを、Optionキーを押しながら右クリックし、「“text-shield”のパス名をコピー」を選びます。
+
+次のプロンプトのパス欄をコピーしたパスに、著作者名の欄を自分の名前やペンネームに置き換えてから、Claude CodeやAntigravityなどのチャットへ貼り付けてください。コピーしたパスの前後に引用符が付いている場合は、そのまま使えます。
+
+Copy the folder path using the steps above. Replace the path and author placeholders below with that path and your name or pen name before sending the prompt to your AI agent.
+
+### 日本語
+
+```text
+[ここにtext-shieldフォルダのパスを貼り付けてください] に取得したtext-shieldを、今使っているAIエージェントのAgent Skillとして導入してください。
+著作者名は「[ここにあなたの著作者名（ペンネーム等）を貼り付けてください]」です。
+README.mdとskills/text-shield/SKILL.mdを読み、Python 3.10以上、4.0未満で動くCLIを準備してください。リポジトリ内の.venvを使い、なければ作成し、そのPythonで -m pip install . を実行してください。
+この環境のスキル探索先を確認し、skills/text-shield/を配置してください。共通スキルの実体がある環境では、その運用に合わせて参照を接続してください。既存のファイルやリンクがあれば削除・上書きせず、競合を報告してください。
+配置したSKILL.mdの読み取りとCLIの --version、protect --help、verify --help、inspect --help を確認してください。新規の一時原稿で、上記の著作者名を --author に渡し、--poison-level off を指定してprotectを実行してください。続けてverifyに --original を指定して照合し、inspectを実行してください。元原稿が変更されていないこと、著作者名が指定どおりであること、本文と元原稿のハッシュが一致することを確認してください。
+最後に配置先、CLIの実行パス、検証結果を教えてください。スキル一覧が更新されない場合は、新しいセッションでの再確認を案内してください。
+```
+
+### English
+
+```text
+Install text-shield from [Paste the absolute path to the text-shield folder here] as an Agent Skill for the AI agent I am currently using.
+My author name is: [Paste your author name / pen name here]
+Read README.md and skills/text-shield/SKILL.md. Prepare the CLI with Python >=3.10,<4.0 using the repository's .venv; create it if needed and run -m pip install . with that environment's Python.
+Find this agent's skill discovery directory and install skills/text-shield/ there. If this environment uses a shared skill directory, connect it according to that convention. Report conflicts without deleting or overwriting existing files or links.
+Confirm the installed SKILL.md is readable and run the CLI's --version, protect --help, verify --help, and inspect --help. Use a new temporary document to run protect with --author set to the author name above and --poison-level off, then verify with --original, and inspect. Quote the author argument if it contains spaces. Check that the original stays unchanged, the extracted author matches the name above, and both hashes match.
+Report the skill location, CLI executable path, and validation results. If the skill list has not refreshed, advise checking in a new session.
+```
+
+## Agent Skillとしての使用例
+
+導入後は、対象のファイルを添えて次のように依頼できます。
+
+- 「このMarkdownをプロテクトしてください。元原稿は残してください。」
+- 「article.mdに透かしを入れて、article.protected.mdへ保存してください。」
+- 「article.protected.mdの署名を検証してください。元原稿はarticle.mdです。」
+- 「このテキストの不可視文字を調べてください。」
+
+スキルは置換を指定しない依頼では `--poison-level off` を使い、処理後に元原稿との照合を実行します。CLIを直接呼ぶ場合の既定値は `medium` です。スキルを配置しても一覧に出ない場合は、新しいエージェントセッションで確認してください。
+
 ## セットアップ
 
 PowerShellでプロジェクトのディレクトリに移動し、開発用環境を作成してください。
@@ -27,7 +77,9 @@ python -m venv .venv
 
 `protect` はUTF-8の入力を読み込み、`-o` で指定した新規ファイルに出力します。省略時はUTF-8で標準出力へ書き込みます。Windows PowerShellのリダイレクトによる文字コード変換を避けるため、ファイル保存には `-o` を使ってください。既存ファイルへの出力と、透かしのある原稿への再適用はエラーにします。
 
-`--author` の既定値は `QuQuLa89`、`--poison-level` の既定値は `medium` です。英字などの置換を避けたい場合は `off` を指定してください。置換率は対象文字ごとの確率で、短い原稿では置換が0件になることもあります。
+`--author` には原稿の著作者名を指定してください。省略すると、環境変数 `TEXT_SHIELD_AUTHOR`、実行場所での `git config user.name` の順に取得します。空または空白だけの環境変数・Git設定は未設定として扱い、どちらからも取得できない場合や `--author` に空白だけを指定した場合は、終了コード `2` で終了します。著作者名の前後の空白は取り除きます。
+
+`--poison-level` の既定値は `medium` です。英字などの置換を避けたい場合は `off` を指定してください。置換率は対象文字ごとの確率で、短い原稿では置換が0件になることもあります。
 
 | 強度     | 対象文字ごとの置換率 |
 | -------- | -------------------- |
@@ -75,7 +127,7 @@ python -m venv .venv
 ```powershell
 .\.venv\Scripts\ruff format .
 .\.venv\Scripts\ruff check --fix .
-npx --yes prettier@3.6.2 --write README.md .pre-commit-config.yaml
+npx --yes prettier@3.6.2 --write README.md skills/text-shield/SKILL.md .pre-commit-config.yaml
 .\.venv\Scripts\python -m pytest -q
 .\.venv\Scripts\python -m build
 ```
@@ -86,4 +138,4 @@ pre-commitはPythonのRuff整形・静的解析と、Markdown・JSON・YAMLのPr
 
 ## ライセンス
 
-ツールのソースコードには [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/legalcode.txt) を適用します。処理対象の原稿に対するライセンス指定ではありません。原稿に注入する宣言は `All-Rights-Reserved` です。
+ツールのソースコードには [MIT License](LICENSE) を適用します。著作権表記は `Copyright (c) 2026 QuQuLa89` です。処理対象の原稿に対するライセンス指定ではありません。原稿に注入する宣言は `All-Rights-Reserved` です。
