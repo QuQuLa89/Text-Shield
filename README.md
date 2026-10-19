@@ -1,8 +1,28 @@
 # Text-Shield
 
+※これは開発中のプロジェクトです。This is a project currently under development.
+
 Markdownやテキストに、学習利用のオプトアウト宣言、ゼロ幅文字の透かし、任意のホモグリフ置換を付与するCLIです。著作者名・埋め込み時刻・ハッシュの抽出と照合、不可視文字の位置の確認ができます。
 
 バージョンは0.1.0です。Python 3.10以上、4.0未満で動作し、実行時の外部依存はありません。
+
+## 確認範囲 / ATTENSION
+
+### 日本語
+
+透かしとオプトアウト宣言は収集や学習を強制的に停止する機能ではありません。トークナイザーへの影響や模倣精度の低下は測定していません。オプトアウト宣言の法的効力も本ツールでは検証していません。
+
+ゼロ幅文字の保持と表示は、フォント・レンダラー・クリップボード・公開サービスに依存します。文字数、改行位置、文字の接合、検索、読み上げに影響する場合があります。ホモグリフも見た目が完全に同一とは限りません。Zenn・Qiita上での表示とコピーの実機検証は未実施です。
+
+ここでの「署名」は著作者名などを埋め込む文字列です。秘密鍵による電子署名や信頼できる時刻認証ではありません。ハッシュの一致は内容の整合を示すもので、著作者や時刻の真正性を証明するものではありません。元原稿と公開時の出力は別途保管してください。
+
+### English
+
+Watermarks and opt-out declarations do not serve to forcibly halt data collection or training. We have not measured their impact on tokenisers or any reduction in imitation accuracy. Nor has this tool verified the legal validity of opt-out declarations.
+
+The preservation and display of zero-width characters depend on the font, renderer, clipboard and public services. This may affect character count, line break positions, character joining, search functions and text-to-speech. Homographs may not always appear completely identical. We have not conducted hands-on verification of how they are displayed and copied on Zenn and Qiita.
+
+The term ‘signature’ used here refers to a string embedding the author’s name and other details. It does not constitute an electronic signature using a private key or a trusted time stamp. A matching hash indicates the integrity of the content; it does not prove the authenticity of the author or the time. Please store the original manuscript and the output at the time of publication separately.
 
 ## CLIとAgent Skillのハイブリッド配布
 
@@ -121,14 +141,6 @@ python -m venv .venv
 透かしはUTF-8文字列をビット列へ変換し、0をU+200B、1をU+200C、両端をU+200Dで表します。本文の通常行の末尾へ完全な透かしを最大3か所に配置し、Markdownの末尾空白による改行を保ちます。本文に配置できない場合は専用の非表示リンク定義に格納します。CLIの透かし内容は `text-shield:v1:` に続くJSONで、署名のUTF-8サイズに応じてファイル容量が増えます。
 
 ホモグリフ置換と透かし配置では、コードフェンス、インラインコード、インデントしたコード、URL、リンク、参照定義、Frontmatter、HTMLタグ、コメントなどを保守的に除外します。表の行とリンクを含む行の後半も除外するため、通常文でも処理対象が少なくなる場合があります。Markdown方言を完全に解析する仕組みではないため、公開前に利用先のプレビューを確認してください。
-
-## 確認範囲
-
-透かしとオプトアウト宣言は収集や学習を強制的に停止する機能ではありません。トークナイザーへの影響や模倣精度の低下は測定していません。オプトアウト宣言の法的効力も本ツールでは検証していません。
-
-ゼロ幅文字の保持と表示は、フォント・レンダラー・クリップボード・公開サービスに依存します。文字数、改行位置、文字の接合、検索、読み上げに影響する場合があります。ホモグリフも見た目が完全に同一とは限りません。Zenn・Qiita上での表示とコピーの実機検証は未実施です。
-
-ここでの「署名」は著作者名などを埋め込む文字列です。秘密鍵による電子署名や信頼できる時刻認証ではありません。ハッシュの一致は内容の整合を示すもので、著作者や時刻の真正性を証明するものではありません。元原稿と公開時の出力は別途保管してください。
 
 ## 開発とテスト
 
