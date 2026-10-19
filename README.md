@@ -1,5 +1,9 @@
 # Text-Shield
 
+[![CI](https://github.com/QuQuLa89/text-shield/actions/workflows/ci.yml/badge.svg)](https://github.com/QuQuLa89/text-shield/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python: 3.10+](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue)](https://www.python.org/)
+
 ※これは開発中のプロジェクトです。This is a project currently under development.
 
 Markdownやテキストに、学習利用のオプトアウト宣言、ゼロ幅文字の透かし、任意のホモグリフ置換を付与するCLIです。著作者名・埋め込み時刻・ハッシュの抽出と照合、不可視文字の位置の確認ができます。
@@ -12,7 +16,7 @@ Markdownやテキストに、学習利用のオプトアウト宣言、ゼロ幅
 
 透かしとオプトアウト宣言は収集や学習を強制的に停止する機能ではありません。トークナイザーへの影響や模倣精度の低下は測定していません。オプトアウト宣言の法的効力も本ツールでは検証していません。
 
-ゼロ幅文字の保持と表示は、フォント・レンダラー・クリップボード・公開サービスに依存します。文字数、改行位置、文字の接合、検索、読み上げに影響する場合があります。ホモグリフも見た目が完全に同一とは限りません。Zenn・Qiita上での表示とコピーの実機検証は未実施です。
+ゼロ幅文字の保持と表示は、フォント・レンダラー・クリップボード・公開サービスに依存します。文字数、改行位置、文字の接合、検索、読み上げに影響する場合があります。ホモグリフも見た目が完全に同一とは限りません。ZennおよびQiitaの公開ページにおいて、表示崩れが発生しないこと、および公開生データから透かし署名が正常に検出・復元できることを実機検証済みです（閲覧環境、フォント、コピー操作、Markdownレンダラーの仕様に依存する場合があります）。
 
 ここでの「署名」は著作者名などを埋め込む文字列です。秘密鍵による電子署名や信頼できる時刻認証ではありません。ハッシュの一致は内容の整合を示すもので、著作者や時刻の真正性を証明するものではありません。元原稿と公開時の出力は別途保管してください。
 
@@ -20,7 +24,7 @@ Markdownやテキストに、学習利用のオプトアウト宣言、ゼロ幅
 
 Watermarks and opt-out declarations do not serve to forcibly halt data collection or training. We have not measured their impact on tokenisers or any reduction in imitation accuracy. Nor has this tool verified the legal validity of opt-out declarations.
 
-The preservation and display of zero-width characters depend on the font, renderer, clipboard and public services. This may affect character count, line break positions, character joining, search functions and text-to-speech. Homographs may not always appear completely identical. We have not conducted hands-on verification of how they are displayed and copied on Zenn and Qiita.
+The preservation and display of zero-width characters depend on the font, renderer, clipboard and public services. This may affect character count, line break positions, character joining, search functions and text-to-speech. Homographs may not always appear completely identical. We have conducted hands-on verification on live Zenn and Qiita pages, confirming that the layout remains intact without display glitches and that watermarks can be successfully detected and restored from live public data (subject to viewing environments, fonts, copy behaviors, and Markdown renderer specifications).
 
 The term ‘signature’ used here refers to a string embedding the author’s name and other details. It does not constitute an electronic signature using a private key or a trusted time stamp. A matching hash indicates the integrity of the content; it does not prove the authenticity of the author or the time. Please store the original manuscript and the output at the time of publication separately.
 
