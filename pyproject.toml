@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "text-shield"
+version = "0.1.0"
+description = "Markdownへのオプトアウト宣言と不可視透かしの付与・検査CLI"
+readme = "README.md"
+requires-python = ">=3.10,<4.0"
+license = "CC0-1.0"
+license-files = ["LICENSE"]
+authors = [{name = "QuQuLa89"}]
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<10", "ruff>=0.5,<1", "pre-commit>=4,<5", "markdown-it-py>=3,<5", "build>=1,<2"]
+
+[project.scripts]
+text-shield = "text_shield.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

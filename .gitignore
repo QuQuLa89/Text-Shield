@@ -1,0 +1,35 @@
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.venv/
+venv/
+ENV/
+.poetry/
+poetry.lock
+
+
+# Local development and secrets
+.env
+.env.*
+*.egg-info/
+dist/
+build/
+.ruff_cache/
+.coverage
+htmlcov/
+.task/
+node_modules/
