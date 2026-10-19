@@ -188,7 +188,7 @@ def test_inspect_candidates_positions_and_color(tmp_path, newline, position):
 def test_help_version_and_bad_level(files):
     source, _ = files
     assert "protect" in run_cli("--help").stdout
-    assert run_cli("--version").stdout.strip() == "0.1.0"
+    assert run_cli("--version").stdout.strip() == "0.2.0"
     assert run_cli("protect", source, "--poison-level", "invalid").returncode == 2
 
 
@@ -200,7 +200,7 @@ def test_installed_entrypoint(tmp_path):
         [str(executable), "--version"], cwd=tmp_path, capture_output=True, check=False
     )
     assert result.returncode == 0
-    assert result.stdout.strip() == b"0.1.0"
+    assert result.stdout.strip() == b"0.2.0"
 
 
 @pytest.mark.parametrize(
