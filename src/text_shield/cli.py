@@ -13,6 +13,7 @@ from pathlib import Path
 from . import __version__
 from .injector import inject_opt_out
 from .poisoner import HOMOGLYPHS, PROBABILITIES, disturb_tokens
+from .stylometry import compare_texts, extract_clean_text, extract_features
 from .utils import sha256_text
 from .watermark import (
     DELIMITER,
@@ -162,11 +163,66 @@ def inspect_text(args: argparse.Namespace) -> int:
     return 0
 
 
+def stylometry(args: argparse.Namespace) -> int:
+    source_text = read_text(args.input_file)
+    if args.compare is not None:
+        result = compare_texts(source_text, read_text(args.compare))
+        if args.json:
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+            return 0
+        print("=== スタイロメトリー照合結果 ===")
+        print(f"基準文書: {args.input_file}")
+        print(f"比較文書: {args.compare}\n")
+        print("指標                 基準文書        比較文書")
+        print("-" * 50)
+        for label, key, format_spec in (
+            ("平均文長", "avg_sentence_len", ".1f"),
+            ("読点比率", "comma_ratio", ".1%"),
+            ("漢字比率", "kanji_ratio", ".1%"),
+            ("ひらがな比率", "hiragana_ratio", ".1%"),
+            ("カタカナ比率", "katakana_ratio", ".1%"),
+            ("英数字比率", "latin_ratio", ".1%"),
+            ("感嘆符・疑問符比率", "exclamation_ratio", ".1%"),
+        ):
+            suffix = "文字" if key == "avg_sentence_len" else ""
+            source = format(result["source_features"][key], format_spec) + suffix
+            target = format(result["target_features"][key], format_spec) + suffix
+            print(f"{label:<16} {source:<14} {target}")
+        print(f"\n文体コサイン類似度: {result['similarity']:.1%}")
+        print(f"判定: {result['assessment']}")
+    else:
+        features = extract_features(extract_clean_text(source_text))
+        if args.json:
+            print(json.dumps(features, ensure_ascii=False, indent=2))
+            return 0
+        print(f"=== 文体プロファイル: {args.input_file} ===")
+        print(
+            f"総文字数: {features['total_chars']:,}文字 / "
+            f"総文数: {features['total_sentences']:,}文"
+        )
+        print(
+            f"平均文長: {features['avg_sentence_len']:.1f}文字 / "
+            f"読点比率: {features['comma_ratio']:.1%}"
+        )
+        print("文字種比率:")
+        for label, key in (
+            ("漢字", "kanji_ratio"),
+            ("ひらがな", "hiragana_ratio"),
+            ("カタカナ", "katakana_ratio"),
+            ("英数字", "latin_ratio"),
+        ):
+            print(f"  {label}: {features[key]:.1%}")
+        print("頻出文末表現:")
+        for index, (ending, count) in enumerate(features["top_endings"], start=1):
+            print(f"  {index}. {ending} ({count / features['total_sentences']:.1%})")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", newline="")
     parser = argparse.ArgumentParser(
-        description="Markdownに透かしとオプトアウト宣言を付与します。"
+        description="Markdownへの透かし付与・検証と文体分析を行います。"
     )
     parser.add_argument("--version", action="version", version=__version__)
     commands = parser.add_subparsers(dest="command", required=True)
@@ -200,6 +256,17 @@ def main(argv: list[str] | None = None) -> int:
         "--color", choices=("auto", "always", "never"), default="auto"
     )
     inspect_parser.set_defaults(handler=inspect_text)
+    stylometry_parser = commands.add_parser(
+        "stylometry", help="文体特徴量を抽出し、文書間の類似度を比較します。"
+    )
+    stylometry_parser.add_argument("input_file", type=Path)
+    stylometry_parser.add_argument(
+        "--compare", type=Path, help="比較するUTF-8文書を指定します。"
+    )
+    stylometry_parser.add_argument(
+        "--json", action="store_true", help="解析・比較結果をJSONで出力します。"
+    )
+    stylometry_parser.set_defaults(handler=stylometry)
     args = parser.parse_args(argv)
     if getattr(args, "limit", 0) < 0:
         parser.error("--limitには0以上の値を指定してください。")

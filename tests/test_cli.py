@@ -315,3 +315,145 @@ def test_unavailable_git_produces_missing_author_error(monkeypatch, failure):
     monkeypatch.setattr("text_shield.cli.subprocess.run", git_config)
     with pytest.raises(ValueError, match="著作者名が指定されていません"):
         resolve_author(None)
+
+
+@pytest.fixture
+def stylometry_files(tmp_path):
+    source = tmp_path / "元原稿.md"
+    target = tmp_path / "比較原稿.md"
+    source.write_text("# 記事見出し\n春である。夏である。秋だろう。", encoding="utf-8")
+    target.write_text("春である。夏である。秋だろう。", encoding="utf-8")
+    return source, target
+
+
+def test_stylometry_profile(stylometry_files):
+    source, _ = stylometry_files
+    before = source.read_bytes()
+    result = run_cli("stylometry", source)
+    assert result.returncode == 0, result.stderr
+    assert not result.stderr
+    assert f"=== 文体プロファイル: {source} ===" in result.stdout
+    assert "総文字数: 20文字 / 総文数: 4文" in result.stdout
+    assert "平均文長: 4.2文字 / 読点比率: 0.0%" in result.stdout
+    for label in ("漢字", "ひらがな", "カタカナ", "英数字", "頻出文末表現"):
+        assert f"{label}:" in result.stdout
+    assert "1. である (50.0%)" in result.stdout
+    assert source.read_bytes() == before
+
+
+def test_stylometry_profile_json(stylometry_files):
+    source, _ = stylometry_files
+    result = run_cli("stylometry", source, "--json")
+    assert result.returncode == 0, result.stderr
+    assert not result.stderr
+    features = json.loads(result.stdout)
+    assert features["total_chars"] == 20
+    assert features["total_sentences"] == 4
+    assert features["avg_sentence_len"] == 4.25
+    assert features["ending_counts"]["である"] == 2
+    assert features["top_endings"][0] == ["である", 2]
+    assert "である" in result.stdout
+
+
+def test_stylometry_comparison(stylometry_files):
+    source, target = stylometry_files
+    before = (source.read_bytes(), target.read_bytes())
+    result = run_cli("stylometry", source, "--compare", target)
+    assert result.returncode == 0, result.stderr
+    assert not result.stderr
+    assert "=== スタイロメトリー照合結果 ===" in result.stdout
+    assert f"基準文書: {source}" in result.stdout
+    assert f"比較文書: {target}" in result.stdout
+    for label in (
+        "平均文長",
+        "読点比率",
+        "漢字比率",
+        "ひらがな比率",
+        "カタカナ比率",
+        "英数字比率",
+    ):
+        assert label in result.stdout
+    assert "文体コサイン類似度:" in result.stdout
+    assert "判定:" in result.stdout
+    assert before == (source.read_bytes(), target.read_bytes())
+
+
+def test_stylometry_compare_json(stylometry_files):
+    _, target = stylometry_files
+    result = run_cli("stylometry", target, "--compare", target, "--json")
+    assert result.returncode == 0, result.stderr
+    assert not result.stderr
+    report = json.loads(result.stdout)
+    assert report["similarity"] == pytest.approx(1.0)
+    assert report["source_features"] == report["target_features"]
+    assert report["vocabulary"] == ["だろう", "である"]
+    assert report["assessment"] == (
+        "文体の類似性が極めて高いです（同一著者または強い依拠・リライトの疑い）"
+    )
+
+
+@pytest.mark.parametrize("compare", [False, True])
+@pytest.mark.parametrize("as_json", [False, True])
+@pytest.mark.parametrize("content", ["", " \n\t", "```\nコードだけ\n```", "短い。"])
+def test_stylometry_empty_or_no_valid_sentences(tmp_path, compare, as_json, content):
+    source = tmp_path / "empty.md"
+    source.write_text(content, encoding="utf-8")
+    options = ["--compare", source] if compare else []
+    if as_json:
+        options.append("--json")
+    result = run_cli("stylometry", source, *options)
+    assert result.returncode == 0, result.stderr
+    assert "Traceback" not in result.stderr
+    if as_json:
+        report = json.loads(result.stdout)
+        if compare:
+            assert report["similarity"] == pytest.approx(1)
+            report = report["source_features"]
+        assert report["total_sentences"] == 0
+    elif not compare:
+        assert "総文数: 0文" in result.stdout
+
+
+@pytest.mark.parametrize("bad_file", ["missing", "invalid_utf8", "directory"])
+@pytest.mark.parametrize("compare", [False, True])
+@pytest.mark.parametrize("as_json", [False, True])
+def test_stylometry_read_errors(tmp_path, stylometry_files, bad_file, compare, as_json):
+    source, _ = stylometry_files
+    bad = tmp_path / "bad.md"
+    if bad_file == "invalid_utf8":
+        bad.write_bytes(b"\xff")
+    elif bad_file == "directory":
+        bad.mkdir()
+    args = ["stylometry", source, "--compare", bad] if compare else ["stylometry", bad]
+    if as_json:
+        args.append("--json")
+    result = run_cli(*args)
+    assert result.returncode == 2
+    assert not result.stdout
+    assert "エラー:" in result.stderr
+    assert "Traceback" not in result.stderr
+
+
+def test_stylometry_parse_errors_and_help(stylometry_files):
+    source, _ = stylometry_files
+    assert run_cli("stylometry").returncode == 2
+    assert run_cli("stylometry", source, "--compare").returncode == 2
+    assert run_cli("stylometry", source, "--unknown").returncode == 2
+    assert "stylometry" in run_cli("--help").stdout
+    result = run_cli("stylometry", "--help")
+    assert result.returncode == 0
+    assert "--compare" in result.stdout
+    assert "--json" in result.stdout
+
+
+def test_stylometry_analysis_error_returns_two(monkeypatch, stylometry_files, capsys):
+    from text_shield.cli import main
+
+    def invalid_analysis(text):
+        raise ValueError("解析できませんでした。")
+
+    monkeypatch.setattr("text_shield.cli.extract_features", invalid_analysis)
+    assert main(["stylometry", str(stylometry_files[0]), "--json"]) == 2
+    captured = capsys.readouterr()
+    assert not captured.out
+    assert "エラー: 解析できませんでした。" in captured.err
