@@ -6,12 +6,19 @@ import unicodedata
 from collections import Counter
 from typing import Any
 
+from .utils import frontmatter_end
 from .watermark import strip_watermarks
 
 
 def extract_clean_text(markdown_text: str) -> str:
     """透かしと主要なMarkdown記法を除き、本文を返します。"""
     text = strip_watermarks(markdown_text).removeprefix("\ufeff")
+    try:
+        text = text[frontmatter_end(text) :]
+    except ValueError:
+        # 終端のない先頭の水平線は、従来どおりMarkdownとして扱います。
+        pass
+    text = re.sub(r"(?m)^ {0,3}\[[^\]]+\]:.*$", "", text)
     text = re.sub(
         r"(?m)^[ \t]*(?:(?:-[ \t]*){3,}|(?:\*[ \t]*){3,}|(?:_[ \t]*){3,})\r?$", "", text
     )

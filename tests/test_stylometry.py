@@ -2,6 +2,7 @@ import math
 
 import pytest
 
+from text_shield.cli import main
 from text_shield.stylometry import (
     build_feature_vector,
     compare_texts,
@@ -60,6 +61,56 @@ def test_watermark_removal_and_non_mutation():
     assert extract_clean_text(marked) == original
     assert compare_texts(original, marked)["similarity"] == pytest.approx(1)
     assert "\u200d" in marked
+
+
+@pytest.mark.parametrize("newline", ["\n", "\r\n"])
+@pytest.mark.parametrize("terminator", ["---", "..."])
+def test_frontmatter_and_reference_definitions_are_excluded(newline, terminator):
+    body = "Pythonで文体を調べます。"
+    markdown = newline.join(
+        [
+            "\ufeff---",
+            "title: Metadata should not count",
+            terminator,
+            "[//]: # (AI-TRAINING-OPT-OUT: Author=QuQuLa89)",
+            "   [reference]: https://example.com",
+            body,
+        ]
+    )
+    assert extract_clean_text(markdown) == body
+
+
+@pytest.mark.parametrize("frontmatter", [False, True])
+@pytest.mark.parametrize("newline", ["\n", "\r\n"])
+@pytest.mark.parametrize(
+    "body", ["# 文体\nPythonを使います。春である。", "```python\nx = 1\n```\n"]
+)
+def test_protect_preserves_stylometry_profile(tmp_path, frontmatter, newline, body):
+    text = ("---\ntitle: Metadata\n---\n" if frontmatter else "") + body
+    text = text.replace("\n", newline)
+    source = tmp_path / "source.md"
+    protected = tmp_path / "protected.md"
+    source.write_bytes(text.encode("utf-8"))
+    assert (
+        main(
+            [
+                "protect",
+                str(source),
+                "-o",
+                str(protected),
+                "--author",
+                "QuQuLa89",
+                "--poison-level",
+                "off",
+            ]
+        )
+        == 0
+    )
+    marked = protected.read_bytes().decode("utf-8")
+    assert "AI-TRAINING-OPT-OUT" in marked
+    assert extract_features(extract_clean_text(marked)) == extract_features(
+        extract_clean_text(text)
+    )
 
 
 @pytest.mark.parametrize("text", ["", " \t\r\n\u3000"])
